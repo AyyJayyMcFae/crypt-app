@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Meta tags for responsiveness and SEO -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>The Iron Crypt</title>
+    <meta name="description" content="Iron Crypt Gym — First and only goth gym in Corpus Christi.">
+
+    <!-- Basic Meta Tags -->
+    <meta property="og:title" content="The Iron Crypt — Corpus Christi’s Goth Gym" />
+    <meta property="og:description" content="Join Corpus Christi’s only horror-themed strongman gym. Open 24/7. Train to the grave!" />
+    <meta property="og:image" content="Images/logo.png" />
+    <meta property="og:url" content="https://theironcrypt.com/" />
+    <meta property="og:type" content="website" />
+
+    <!-- Twitter Card (optional but good) -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The Iron Crypt — Corpus Christi’s Goth Gym" />
+    <meta name="twitter:description" content="Join Corpus Christi’s only horror-themed strongman gym. Open 24/7. Train to the grave!" />
+    <meta name="twitter:image" content="Images/logo.png" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('Service Worker registration failed:', err);
+                    });
+            });
+        }
+    </script>
+
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" xintegrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Pacifico&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Germania+One&family=Pirata+One&family=Special+Elite&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" href="https://github.com/AyyJayyMcFae/The-Iron-Crypt/blob/main/Images/favicon.ico?raw=true" type="image/ico">
+
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- Firebase Libraries -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Initialize Firebase
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+            
+            // Expose global variables for use in other scripts
+            window.db = db;
+            window.auth = auth;
+            window.appId = appId;
+            window.userId = null;
+
+            // Handle authentication
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    window.userId = user.uid;
+                    console.log("User signed in with UID:", window.userId);
+                    // Load profile and other user data
+                    await loadUserProfile();
+                    await loadCheckInQR();
+                } else {
+                    console.log("No user signed in. Attempting anonymous sign-in.");
+                    if (initialAuthToken) {
+                        try {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } catch (error) {
+                            console.error("Custom token sign-in failed:", error);
+                            await signInAnonymously(auth);
+                        }
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                }
+            });
+        }
+    </script>
+    
+    <style>
+        /* General styles and layout */
+        :root {
+            --base: #151515;
+            --secondary: #222222;
+            --accent: #b8b7c2;
+            --text-light: #ddd;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: var(--text-light);
+            background-color: var(--base);
+            padding-bottom: 80px; /* Add padding for the fixed nav */
+            overflow: hidden; /* Hide overflow to prevent scrolling of hidden sections */
+        }
+
+        /* Main app container */
+        .app-container {
+            height: 100vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 54px; /* Match .pwa-bottom-nav height */
+        }
+
+        /* Screen sections to be toggled */
+        .screen {
+            display: none;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* PWA-like bottom navigation */
+        .pwa-bottom-nav {
+            background-color: var(--secondary);
+            color: var(--accent);
+            padding: 6px 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 54px; /* Smaller height */
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .pwa-bottom-nav .nav-item {
+            flex: 1; /* Each item takes equal space */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--accent);
+            transition: color 0.2s ease;
+            text-decoration: none;
+            font-family: "Special Elite";
+            text-transform: uppercase;
+            min-width: 0; /* Prevent overflow from long text */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pwa-bottom-nav .nav-item.active,
+        .pwa-bottom-nav .nav-item:hover {
+            color: var(--text-light);
+        }
+
+        .pwa-bottom-nav .icon {
+            font-size: 1.5rem; /* Smaller icon */
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s ease, color 0.2s ease;
+        }
+
+        .pwa-bottom-nav .icon:active {
+            transform: scale(0.9);
+        }
+        
+        /* QR Code section styling */
+        .checkin-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 50vh;
+        }
+        #qrcode {
+            background-color: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+        .uploaded-qr-img {
+            max-width: 300px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            display: none; /* Hidden by default */
+        }
+        .upload-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .file-input-label {
+            background: #171718;
+            color: #fff;
+            padding: 12px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background 0.3s ease;
+            font-family: "Special Elite";
+            font-size: 1.2rem;
+            cursor: pointer;
+            text-align: center;
+        }
+        .file-input-label:hover {
+            background: #b8b7c2;
+        }
+        #qr-file-input {
+            display: none;
+        }
+
+        /* Hero section styles */
+        .hero {
+            position: relative;
+            height: 82vh;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px; /* App-like rounded corners */
+        }
+
+        .hero-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            text-align: center;
+            color: #fff;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            padding-bottom: 25vh;
+            pointer-events: none;
+        }
+
+        /* Show the active slide */
+        .hero-slide.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            padding: 0 20px;
+        }
+
+        .hero h2 {
+            text-shadow: 2px 2px 4px #000;
+            font-family: "Pirata One", cursive;
+            font-size: 3rem;
+        }
+
+        /* Modal styles */
+        .modal-iframe {
+            max-width: 90%;
+            max-height: 90%;
+            width: 800px;
+            height: 600px;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .modal-iframe iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Button styles */
+        .btn {
+            background: #171718;
+            color: #fff;
+            padding: 12px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background 0.3s ease;
+            font-family: "Special Elite";
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #b8b7c2;
+        }
+
+        .btn.open-join-modal {
+            color: #fff;
+            font-family: 'Special Elite', cursive;
+            font-size: 1.2rem;
+        }
+        
+        .brightness-toggle-btn {
+            margin-top: 20px;
+        }
+
+        .hero-blur {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
+            overflow: hidden;
+            filter: blur(30px) brightness(0.3);
+        }
+
+        .hero-blur .hero-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .hero-blur .hero-slide.active {
+            opacity: 1;
+        }
+
+        .hero {
+            position: relative;
+            height: 82vh;
+            z-index: 1;
+        }
+
+        .hero-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .hero-slide.active {
+            opacity: 1;
+        }
+        
+        /* Brightness effect */
+        .full-brightness {
+            filter: brightness(1.5); /* or another high value */
+        }
+
+        /* Section styles - now styled to look like app "cards" */
+        section {
+            padding: 20px;
+            margin: 20px;
+            background-color: var(--secondary);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        section h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Announcements card styles */
+        .announcements-grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .announcement-card {
+            background-color: #1c1c1c;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s ease;
+        }
+
+        .announcement-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .announcement-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .announcement-content {
+            padding: 15px;
+        }
+        
+        .announcement-content h3 {
+            font-family: 'Special Elite';
+            margin-top: 0;
+        }
+
+        .announcement-content p {
+            margin-top: 0;
+            font-size: 1rem;
+            text-align: left;
+        }
+
+        .announcement-content small {
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+
+        /* Carousel styles */
+        .carousel {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            gap: 20px;
+            padding: 20px 0;
+        }
+
+        .carousel::-webkit-scrollbar {
+            display: none;
+        }
+
+        .carousel {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .slide {
+            position: relative;
+            flex: 0 0 auto;
+            width: 300px;
+            height: 400px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 8px;
+            display: flex;
+            align-items: flex-end;
+            overflow: hidden;
+            scroll-snap-align: center;
+        }
+
+        .slide::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.068);
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .slide-content {
+            position: relative;
+            z-index: 1;
+            color: #fff;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Hours and paragraph styles */
+        .hours {
+            font-size: 1.2rem;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            font-family: special elite;
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Contact section styles */
+        #contact-screen .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        #contact-screen form {
+            display: grid;
+            gap: 15px;
+            max-width: 100%;
+        }
+
+        #contact-screen input,
+        #contact-screen textarea {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--secondary);
+            color: var(--text-light);
+        }
+
+        #contact-screen button {
+            background: #171718;
+            color: #fff;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        #contact-screen button:hover {
+            background: #3f3f3f;
+        }
+
+        #contact-screen .map {
+            width: 100%;
+            height: 300px;
+            border-radius: 8px;
+        }
+
+        /* Events section styles */
+        #events-screen {
+            padding: 40px 20px;
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        #events-screen .event {
+            background: #1c1c1c;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #edecf9;
+            border-radius: 4px;
+        }
+
+        #events-screen h3 {
+            font-family: 'Special Elite';
+            margin-top: 0;
+        }
+        
+        .profile-info p {
+            font-family: "Special Elite";
+            font-size: 1.1rem;
+            margin: 5px 0;
+        }
+        
+        .shop-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #1c1c1c;
+            border-radius: 8px;
+        }
+        
+        .shop-item img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-right: 15px;
+        }
+        
+        .item-details h4 {
+            margin: 0;
+            font-family: "Special Elite";
+            font-size: 1.2rem;
+        }
+        
+        .item-details p {
+            margin: 5px 0 0;
+            font-family: "Roboto", sans-serif;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        /* Footer styles */
+        footer {
+            background: #222222;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        footer a {
+            color: #fff;
+            margin: 0 5px;
+            text-decoration: underline;
+        }
+
+        header h1 img {
+            height: 3.5vh;
+            width: auto;
+            display: block;
+            max-width: 100%;
+        }
+
+        header a {
+            font-family: "Special Elite";
+        }
+
+        /* Responsive styles */
+        @media (max-width: 800px) {
+            header {
+                display: none; /* Hide desktop header on smaller screens */
+            }
+
+            .hero {
+                height: 50vh;
+            }
+
+            #contact-screen .contact-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pwa-bottom-nav .nav-item {
+                font-size: 0.7rem;
+                padding: 0 5px;
+            }
+
+            .pwa-bottom-nav .icon {
+                font-size: 2rem;
+            }
+        }
+
+        /* Modal overlay styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.visible {
+            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+
+        .modal .close {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: #fff;
+            font-size: 40px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Home screen -->
+        <section id="home-screen" class="screen active">
+            <div class="hero">
+                <div class="hero-slide active" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756575574/image_2025-08-30_123932089_vs6rlz.png');">
+                    <div class="hero-content">
+                        <h2>Welcome to The Iron Crypt</h2>
+                        <a href="#" class="btn open-join-modal" style="font-family:Special Elite; font-weight: 200;">Join Us</a>
+                    </div>
+                </div>
+                <div class="hero-slide" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756592064/image_2025-08-30_171422415_ev3fj9.png'); background-position: center 5%;">
+                    <div class="hero-content">
+                        <h2>Strongman Saturdays</h2>
+                        <p style="font-family: Special Elite;">EVERY SATURDAY @ 11am & 5pm</p>
+                        <p style="font-family: Special Elite;">FREE DROP-IN FOR ANYONE THAT WANTS TO TRY STRONGMAN</p>
+                        <a href="#" class="btn open-join-modal">Join Now</a>
+                    </div>
+                </div>
+                <div class="hero-slide" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756575686/image_2025-08-30_124109810_r72iyh.png'); background-position: center 40%;">
+                    <div class="hero-content">
+                        <h2>Kate Herman Photoshoot</h2>
+                        <a href="gallery.html" class="btn" target="_blank" rel="noopener">See Full Set</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- About section -->
+            <section id="about">
+                <h2 style="font-family:'Special Elite'; font-size: 2.5rem;">𝕿𝖗𝖆𝖎𝖓 𝖙𝖔 𝖙𝖍𝖊 𝕲𝖗𝖆𝖛𝖊 💪🏼🪦</h2>
+                <p>We are the only horror gym in Texas and the only gym with strongman equipment in Corpus Christi! Family owned, 🇲🇽🏳️‍🌈 owned</p>
+                <p class="hours">Hours: Mon–Sun: Open All Day</p>
+            </section>
+        </section>
+
+        <!-- Announcements screen -->
+        <section id="announcements-screen" class="screen">
+            <h2 style="font-family:'Special Elite';">Announcements</h2>
+            <div class="announcements-grid">
+                <div class="announcement-card">
+                    <img src="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756592064/image_2025-08-30_171422415_ev3fj9.png" alt="Strongman Class">
+                    <div class="announcement-content">
+                        <h3>New Strongman Class Added</h3>
+                        <p>Due to popular demand, we've added a new Strongman class on Wednesdays at 6pm! Sign up now to reserve your spot.</p>
+                        <small>Posted: October 18, 2025</small>
+                    </div>
+                </div>
+                <div class="announcement-card">
+                    <img src="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756575574/image_2025-08-30_123932089_vs6rlz.png" alt="Gym Closure">
+                    <div class="announcement-content">
+                        <h3>Gym Closure for Maintenance</h3>
+                        <p>The gym will be closed on October 25th for scheduled maintenance. We apologize for any inconvenience.</p>
+                        <small>Posted: October 20, 2025</small>
+                    </div>
+                </div>
+                <div class="announcement-card">
+                    <img src="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756608557/image_2025-08-30_215915359_w11d5x.png" alt="Halloween Party">
+                    <div class="announcement-content">
+                        <h3>Halloween Party!</h3>
+                        <p>Join us for our annual Halloween party on October 31st. Costumes are highly encouraged!</p>
+                        <small>Posted: October 15, 2025</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Check-in screen -->
+        <section id="check-in-screen" class="screen">
+            <h2 style="font-family:'Special Elite';">Check-in</h2>
+            <p id="qr-message">Scan this QR code at the front desk to check in.</p>
+            <div class="checkin-container">
+                <img id="uploaded-qr-img" class="uploaded-qr-img" />
+                <div id="qrcode"></div>
+                <div class="upload-buttons">
+                    <input type="file" id="qr-file-input" accept="image/*" />
+                    <label for="qr-file-input" class="file-input-label">Upload QR Code</label>
+                    <button id="clear-qr-btn" class="btn" style="display:none;">Clear</button>
+                </div>
+                <button class="btn brightness-toggle-btn">Maximize Screen Brightness</button>
+            </div>
+        </section>
+        
+        <!-- Shop screen -->
+        <section id="shop-screen" class="screen">
+            <h2 style="font-family:'Special Elite';">The Crypt Shop</h2>
+            <p>Grab a cold drink or a snack to refuel after your workout.</p>
+            <div id="shop-items-container">
+                <!-- Shop items will be loaded here from Firestore -->
+            </div>
+        </section>
+
+        <!-- Profile screen -->
+        <section id="profile-screen" class="screen">
+            <h2 style="font-family:'Special Elite';">My Profile</h2>
+            <p>Your membership and personal information.</p>
+            <div class="profile-info">
+                <p><strong>User ID:</strong> <span id="profile-user-id">Loading...</span></p>
+                <p><strong>Name:</strong> <span id="profile-name">Loading...</span></p>
+                <p><strong>Membership Status:</strong> <span id="profile-status">Loading...</span></p>
+                <p><strong>Member Since:</strong> <span id="profile-join-date">Loading...</span></p>
+            </div>
+        </section>
+        
+        <!-- Existing Photos screen (now a tab) -->
+        <section id="photos-screen" class="screen">
+            <h2 style="font-family:'Special Elite';">Featured Shots</h2>
+            <div class="carousel">
+                <!-- Each slide is a featured photo -->
+                <div class="slide" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756593390/image_2025-08-30_173628557_hyarvf.png');" data-full="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756593390/image_2025-08-30_173628557_hyarvf.png">
+                    <div class="slide-content">
+                        <h3></h3>
+                        <p></p>
+                    </div>
+                </div>
+                <div class="slide" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756593248/image_2025-08-30_173357301_lffgkg.png');" data-full="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756593248/image_2025-08-30_173357301_lffgkg.png">
+                    <div class="slide-content">
+                        <h3></h3>
+                        <p></p>
+                    </div>
+                </div>
+                <div class="slide" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756593312/image_2025-08-30_173510315_yc468n.png');" data-full="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756593312/image_2025-08-30_173510315_yc468n.png">
+                    <div class="slide-content">
+                        <h3></h3>
+                        <p></p>
+                    </div>
+                </div>
+                <div class="slide" style="background-image: url('https://res.cloudinary.com/dzhvdoifb/image/upload/v1756575740/image_2025-08-30_124218986_omhs4g.png');" data-full="https://res.cloudinary.com/dzhvdoifb/image/upload/v1756575740/image_2025-08-30_124218986_omhs4g.png">
+                    <div class="slide-content">
+                        <h3>Lillith</h3>
+                        <p>Captured by@Katehermanphotography during our 11am Strongman Saturday Slot</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Elfsight Google Reviews | Untitled Google Reviews -->
+            <section id="reviews">
+                <h2 style="font-family:'Special Elite';">What Our Members Say</h2>
+                <div class="elfsight-app-2808d1cd-3ec6-4b95-a5fe-c693e4def196"></div>
+
+                <script src="https://static.elfsight.com/platform/platform.js" async></script>
+            </section>
+        </section>
+        
+        <!-- Existing Contact screen (now a tab) -->
+        <section id="contact-screen" class="screen">
+            <h2 style="font-family:'Special Elite';">Contact Us</h2>
+            <div class="contact-grid">
+                <div>
+                    <form>
+                        <input type="text" name="name" placeholder="Your Name" required />
+                        <input type="email" name="email" placeholder="Your Email" required />
+                        <textarea name="message" rows="5" placeholder="Your Message" required></textarea>
+                        <button type="submit">Send Message</button>
+                    </form>
+                    <p>Phone: <a href="tel:2108807707">210-880-7707</a></p>
+                    <p>Email: <a href="mailto:ironcryptgym@gmail.com">ironcryptgym@gmail.com</a></p>
+                    <p>Find us at: 6062 Holly Rd B1, Corpus Christi</p>
+                </div>
+                <div>
+                    <!-- Embedded Google Map -->
+                    <iframe class="map" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3532.7576579781435!2d-97.36860588817444!3d27.693884076091027!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8668f5f237a61d2f%3A0x189e624a2d9c3f30!2sThe%20Iron%20Crypt!5e0!3m2!1sen!2sus!4v1753047686591!5m2!1sen!2sus" width="100%" height="300" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal for image viewing -->
+    <div id="image-modal" class="modal">
+        <span class="close">×</span>
+        <img class="modal-content" id="modal-img">
+    </div>
+
+    <!-- Modal for joining the gym -->
+    <div id="join-modal" class="modal">
+        <span class="close">×</span>
+        <div class="modal-content modal-iframe">
+            <iframe src="https://my.rhinofit.ca/store/index/ea059b62" frameborder="0"></iframe>
+        </div>
+    </div>
+    
+    <!-- The new, PWA-like bottom navigation -->
+    <nav class="pwa-bottom-nav">
+        <a class="nav-item active" data-screen-id="home-screen">
+            <div class="icon"><i class="fas fa-home"></i></div>
+            <span>Home</span>
+        </a>
+        <a class="nav-item" data-screen-id="announcements-screen">
+            <div class="icon"><i class="fas fa-bullhorn"></i></div>
+            <span>Announcements</span>
+        </a>
+        <a class="nav-item" data-screen-id="check-in-screen">
+            <div class="icon"><i class="fas fa-qrcode"></i></div>
+            <span>Check-in</span>
+        </a>
+        <a class="nav-item" data-screen-id="shop-screen">
+            <div class="icon"><i class="fas fa-shopping-bag"></i></div>
+            <span>Shop</span>
+        </a>
+        <a class="nav-item" data-screen-id="profile-screen">
+            <div class="icon"><i class="fas fa-user"></i></div>
+            <span>Profile</span>
+        </a>
+    </nav>
+    
+    <!-- JavaScript for modal and carousel functionality -->
+    <script>
+        // Screen switching functionality
+        const screens = document.querySelectorAll('.screen');
+        const navItems = document.querySelectorAll('.pwa-bottom-nav .nav-item');
+        
+        // This function will handle screen visibility
+        function showScreen(screenId) {
+            screens.forEach(s => s.classList.remove('active'));
+            navItems.forEach(n => n.classList.remove('active'));
+            
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+                const navItem = document.querySelector(`.nav-item[data-screen-id="${screenId}"]`);
+                if(navItem) {
+                    navItem.classList.add('active');
+                }
+                targetScreen.scrollTop = 0; // Scroll to top of new screen
+            }
+        }
+        
+        navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const screenId = item.getAttribute('data-screen-id');
+                
+                showScreen(screenId);
+                
+                // Special actions for each screen
+                if (screenId === 'check-in-screen') {
+                    loadCheckInQR();
+                } else if (screenId === 'profile-screen') {
+                    loadUserProfile();
+                } else if (screenId === 'shop-screen') {
+                    loadShopItems();
+                }
+            });
+        });
+
+        // Modal for viewing carousel images
+        const imageModal = document.getElementById("image-modal");
+        const modalImg = document.getElementById("modal-img");
+        const closeBtn = imageModal.querySelector(".close");
+
+        // Open modal when a slide is clicked
+        document.querySelectorAll(".slide").forEach(slide => {
+            slide.addEventListener("click", () => {
+                const fullImg = slide.getAttribute("data-full");
+                imageModal.classList.add('visible');
+                modalImg.src = fullImg;
+            });
+        });
+
+        // Close modal when close button is clicked
+        closeBtn.onclick = () => {
+            imageModal.classList.remove('visible');
+            modalImg.src = "";
+        };
+
+        // Close modal when clicking outside the image
+        imageModal.onclick = (e) => {
+            if (e.target === imageModal) {
+                imageModal.classList.remove('visible');
+                modalImg.src = "";
+            }
+        };
+
+        // Hero section carousel auto-rotation
+        const slides = document.querySelectorAll('.hero-slide');
+        let current = 0;
+
+        setInterval(() => {
+            slides[current].classList.remove('active');
+            current = (current + 1) % slides.length;
+            slides[current].classList.add('active');
+        }, 7000);
+
+        // Modal for "Join Now" button and new nav link
+        const joinModal = document.getElementById("join-modal");
+        const closeBtns = document.querySelectorAll(".modal .close");
+        const openJoinBtns = document.querySelectorAll(".open-join-modal");
+        
+        // Function to open the join modal
+        function openJoinModal() {
+            joinModal.classList.add('visible');
+        }
+
+        // Add event listeners for the "Join" buttons
+        openJoinBtns.forEach(btn => {
+            btn.addEventListener("click", function(e) {
+                e.preventDefault();
+                openJoinModal();
+            });
+        });
+        
+        // Fix: Add event listeners to all close buttons to correctly close their parent modal
+        closeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.closest(".modal").classList.remove('visible');
+            });
+        });
+
+        // Close join modal when clicking outside content
+        window.onclick = (e) => {
+            if (e.target === joinModal) {
+                joinModal.classList.remove('visible');
+            }
+        };
+        
+        // New functionality for the Check-in screen
+        const qrCodeContainer = document.getElementById("qrcode");
+        const uploadedImg = document.getElementById('uploaded-qr-img');
+        const fileInput = document.getElementById('qr-file-input');
+        const clearBtn = document.getElementById('clear-qr-btn');
+        const qrMessage = document.getElementById('qr-message');
+        const brightnessBtn = document.querySelector(".brightness-toggle-btn");
+        let isBrightnessMax = false;
+        
+        // Function to load the QR code, either from localStorage or by generating a new one
+        async function loadCheckInQR() {
+            const savedImage = localStorage.getItem('qrCodeImage');
+            if (savedImage) {
+                // If a saved image exists, display it
+                uploadedImg.src = savedImage;
+                uploadedImg.style.display = 'block';
+                qrCodeContainer.style.display = 'none';
+                clearBtn.style.display = 'block';
+                qrMessage.textContent = 'Your saved QR code:';
+            } else {
+                // Otherwise, generate the user ID QR code
+                if (!window.userId) {
+                    // Fallback or wait for user ID
+                    qrCodeContainer.style.display = 'block';
+                    uploadedImg.style.display = 'none';
+                    clearBtn.style.display = 'none';
+                    qrCodeContainer.innerHTML = '';
+                    qrMessage.textContent = 'Scan this QR code at the front desk to check in.';
+                    return;
+                }
+                const dataToEncode = window.userId;
+                qrCodeContainer.innerHTML = '';
+                new QRCode(qrCodeContainer, {
+                    text: dataToEncode,
+                    width: 256,
+                    height: 256,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                
+                uploadedImg.style.display = 'none';
+                qrCodeContainer.style.display = 'block';
+                clearBtn.style.display = 'none';
+                qrMessage.textContent = 'Scan this QR code at the front desk to check in.';
+            }
+        }
+        
+        // Handle file upload
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    localStorage.setItem('qrCodeImage', event.target.result);
+                    loadCheckInQR(); // Reload the section to show the new image
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Handle clearing the saved image
+        clearBtn.addEventListener('click', () => {
+            localStorage.removeItem('qrCodeImage');
+            loadCheckInQR(); // Reload the section to go back to the default QR code
+        });
+        
+        brightnessBtn.addEventListener('click', () => {
+            if (isBrightnessMax) {
+                document.body.style.filter = '';
+                brightnessBtn.textContent = 'Maximize Screen Brightness';
+            } else {
+                document.body.style.filter = 'brightness(1.5)';
+                brightnessBtn.textContent = 'Reset Brightness';
+            }
+            isBrightnessMax = !isBrightnessMax;
+        });
+        
+        // New functionality for the Profile screen
+        async function loadUserProfile() {
+            if (!window.db || !window.userId) {
+                return;
+            }
+            
+            const docRef = doc(window.db, `artifacts/${window.appId}/users/${window.userId}/membership/data`);
+            const docSnap = await getDoc(docRef);
+            
+            const profileUserId = document.getElementById('profile-user-id');
+            const profileName = document.getElementById('profile-name');
+            const profileStatus = document.getElementById('profile-status');
+            const profileJoinDate = document.getElementById('profile-join-date');
+            
+            profileUserId.textContent = window.userId;
+
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                profileName.textContent = data.name || 'N/A';
+                profileStatus.textContent = data.status || 'N/A';
+                profileJoinDate.textContent = data.joinDate || 'N/A';
+            } else {
+                // If no profile exists, create a default one
+                await setDoc(docRef, {
+                    name: "New Member",
+                    status: "Active",
+                    joinDate: new Date().toLocaleDateString(),
+                    userId: window.userId
+                });
+                
+                profileName.textContent = "New Member";
+                profileStatus.textContent = "Active";
+                profileJoinDate.textContent = new Date().toLocaleDateString();
+            }
+        }
+        
+        // New functionality for the Shop screen
+        async function loadShopItems() {
+            if (!window.db || !window.userId) {
+                return;
+            }
+            const shopItemsContainer = document.getElementById('shop-items-container');
+            shopItemsContainer.innerHTML = ''; // Clear previous items
+
+            const shopData = [
+                { id: "item1", name: "Pre-Workout Drink", price: "$4.00", img: "https://placehold.co/80x80/222222/FFF?text=Pre-W" },
+                { id: "item2", name: "Protein Bar", price: "$3.50", img: "https://placehold.co/80x80/222222/FFF?text=Bar" },
+                { id: "item3", name: "Water Bottle", price: "$2.00", img: "https://placehold.co/80x80/222222/FFF?text=Water" }
+            ];
+            
+            shopData.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'shop-item';
+                itemDiv.innerHTML = `
+                    <img src="${item.img}" alt="${item.name}">
+                    <div class="item-details">
+                        <h4>${item.name}</h4>
+                        <p>Price: ${item.price}</p>
+                    </div>
+                `;
+                shopItemsContainer.appendChild(itemDiv);
+            });
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            showScreen('home-screen'); // Ensure home screen is shown on load
+        });
+    </script>
+</body>
+</html>
