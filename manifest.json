@@ -1,0 +1,36 @@
+{
+"name": "The Iron Crypt",
+"short_name": "Iron Crypt",
+"description": "Corpus Christi's Only 24-hour Horror Gym.",
+"start_url": "./index.html",
+"display": "standalone",
+"background_color": "#222222",
+"theme_color": "#171717",
+"icons": [
+{
+"src": "hhttps://res.cloudinary.com/dzhvdoifb/image/upload/v1756592103/image_2025-08-30_171502118_ebhwoz.png",
+"sizes": "48x48",
+"type": "image/png"
+},
+{
+"src": "https://res.cloudinary.com/dzhvdoifb/image/upload/v1756592103/image_2025-08-30_171502118_ebhwoz.png",
+"sizes": "96x96",
+"type": "image/png"
+},
+{
+"src": "hhttps://res.cloudinary.com/dzhvdoifb/image/upload/v1756592103/image_2025-08-30_171502118_ebhwoz.png",
+"sizes": "144x144",
+"type": "image/png"
+},
+{
+"src": "https://res.cloudinary.com/dzhvdoifb/image/upload/v1756592103/image_2025-08-30_171502118_ebhwoz.png",
+"sizes": "192x192",
+"type": "image/png"
+},
+{
+"src": "https://res.cloudinary.com/dzhvdoifb/image/upload/v1756592103/image_2025-08-30_171502118_ebhwoz.png",
+"sizes": "512x512",
+"type": "image/png"
+}
+]
+}
